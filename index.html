@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>Confirmação de Presença</title>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 20px;
+      background-color: #f5f5f5;
+    }
+    form {
+      display: none;
+      margin-top: 20px;
+    }
+    label, select, input {
+      display: block;
+      margin: 10px auto;
+      width: 90%;
+      max-width: 400px;
+    }
+    #status {
+      font-size: 1.1em;
+      margin-top: 20px;
+      color: #333;
+    }
+    #mensagemFinal {
+      display: none;
+      color: green;
+      font-weight: bold;
+      margin-top: 20px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Confirmação de Presença</h1>
+  <p><strong>Local do Evento:</strong><br>Avenida Trípoli, nº 135, Bairro Jorge Lavocat<br>Rio Branco - AC, Brasil - CEP 69922-050</p>
+  <p><strong>Horário permitido:</strong> Das 18h00 até 2h00 da manhã</p>
+
+  <p id="status">Verificando localização e horário...</p>
+
+  <form id="formPresenca" action="https://formsubmit.co/el/bimuje" method="POST">
+    <input type="hidden" name="_captcha" value="false" />
+    <input type="hidden" name="_template" value="table" />
+
+    <label for="nome">Nome:</label>
+    <input type="text" id="nome" name="Nome" required />
+
+    <label for="tipo">Você é:</label>
+    <select id="tipo" name="Tipo" required>
+      <option value="">Selecione</option>
+      <option value="Aluno">Aluno</option>
+      <option value="Visitante">Visitante</option>
+    </select>
+
+    <div id="camposAluno" style="display: none;">
+      <label for="matricula">Matrícula:</label>
+      <input type="text" id="matricula" name="Matrícula" />
+
+      <label for="turma">Turma:</label>
+      <input type="text" id="turma" name="Turma" />
+    </div>
+
+    <button type="submit">Confirmar Presença</button>
+  </form>
+
+  <p id="mensagemFinal">Seja bem-vindo, aproveite o evento.</p>
+
+  <script>
+    const destinoLat = -9.927527;
+    const destinoLon = -67.841083;
+    const raioPermitido = 500; // metros
+
+    function getDistanceFromLatLonInMeters(lat1, lon1, lat2, lon2) {
+      const R = 6371000; // raio da Terra em metros
+      const dLat = (lat2 - lat1) * Math.PI / 180;
+      const dLon = (lon2 - lon1) * Math.PI / 180;
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      return R * c;
+    }
+
+    function verificarHorarioPermitido() {
+      const agora = new Date();
+      const hora = agora.getHours();
+      const minutos = agora.getMinutes();
+      const minutosAgora = hora * 60 + minutos;
+
+      const inicio = 18 * 60; // 18h00
+      const fim = 2 * 60;     // 2h00 da manhã
+
+      return (minutosAgora >= inicio || minutosAgora < fim);
+    }
+
+    function jaPreencheuHoje() {
+      const hoje = new Date().toISOString().split('T')[0];
+      return localStorage.getItem('presenca-' + hoje) === 'true';
+    }
+
+    function marcarPresencaHoje() {
+      const hoje = new Date().toISOString().split('T')[0];
+      localStorage.setItem('presenca-' + hoje, 'true');
+    }
+
+    function verificarTudo() {
+      if (!verificarHorarioPermitido()) {
+        document.getElementById("status").innerText = "Presença permitida apenas entre 18h e 2h.";
+        return;
+      }
+
+      if (jaPreencheuHoje()) {
+        document.getElementById("status").innerText = "Presença já registrada hoje neste dispositivo.";
+        return;
+      }
+
+      if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition(pos => {
+          const lat = pos.coords.latitude;
+          const lon = pos.coords.longitude;
+          const distancia = getDistanceFromLatLonInMeters(lat, lon, destinoLat, destinoLon);
+
+          if (distancia <= raioPermitido) {
+            document.getElementById("status").innerText = "Localização confirmada. Preencha o formulário.";
+            document.getElementById("formPresenca").style.display = 'block';
+          } else {
+            document.getElementById("status").innerText = "Você não está no local autorizado para confirmar presença.";
+          }
+        }, erro => {
+          document.getElementById("status").innerText = "Erro ao acessar sua localização. Permita o acesso.";
+        });
+      } else {
+        document.getElementById("status").innerText = "Seu navegador não suporta geolocalização.";
+      }
+    }
+
+    document.getElementById("tipo").addEventListener("change", function () {
+      document.getElementById("camposAluno").style.display = this.value === "Aluno" ? 'block' : 'none';
+    });
+
+    document.getElementById("formPresenca").addEventListener("submit", function(e) {
+      marcarPresencaHoje();
+      document.getElementById("formPresenca").style.display = 'none';
+      document.getElementById("mensagemFinal").style.display = 'block';
+    });
+
+    verificarTudo();
+  </script>
+</body>
+</html>
